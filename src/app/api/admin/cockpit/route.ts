@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     // Get all Sales Employees
     const salesEmployees = await User.find({ 
-      role: 'sales',
+      role: {$in:['sales','Sales']},
       isActive: true 
     }).select('name employeeId department target');
 

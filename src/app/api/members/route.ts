@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       password,
       role,
       department,
+      division,
       joiningDate,
       target,
       salary,           // ← New Field Added
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
       employeeId,
       role,
       department,
+      division,
       joiningDate: joiningDate ? new Date(joiningDate) : Date.now(),
       target: target ? Number(target) : 0,
       salary: salary ? Number(salary) : 0,           // ← Salary Added
@@ -88,6 +90,7 @@ export async function POST(request: NextRequest) {
         employeeId: newUser.employeeId,
         role: newUser.role,
         department: newUser.department,
+        division:newUser.division,
         salary: newUser.salary,          // ← Return salary too
       },
       defaultPassword: finalPassword,

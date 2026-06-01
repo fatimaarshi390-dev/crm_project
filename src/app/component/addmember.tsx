@@ -97,7 +97,7 @@ export default function AddMemberDialog() {
 
   const fetchDivisions = async () => {
     try {
-      const res = await fetch('/api/divisions');
+      const res = await fetch('/api/division');
       const data = await res.json();
       if (data.success) setDivisions(data.data || []);
     } catch (error) {
@@ -390,7 +390,7 @@ const deleteRole = async (id: string, roleName: string) => {
                 <SelectContent>
                   {divisions.map((div) => (
                     <SelectItem key={div._id} value={div.divisionName}>
-                      {div.divisionName}
+                      {div.divisionName} ({div.departmentName})
                     </SelectItem>
                   ))}
                 </SelectContent>

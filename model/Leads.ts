@@ -5,7 +5,8 @@ export interface ILead extends Document {
   eqName: string;
   contact: string;
   course?: string;
-  department?: string;           // ← NEW FIELD
+  department?: string;  
+  division?: string;         // ← NEW FIELD
   city?: string;
   state?: string;
   address?: string;
@@ -78,7 +79,8 @@ const LeadSchema = new Schema<ILead>(
     eqName: { type: String, required: true, trim: true },
     contact: { type: String, required: true },
     course: String,
-    department: String,                    // ← NEW FIELD ADDED
+    department: String,   
+    division: String,         // ← NEW FIELD ADDED
     city: String,
     state: String,
     address: String,
