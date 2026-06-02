@@ -219,10 +219,10 @@ const processOCR = async (file: File) => {
           </div>
 
           <div>
-            <Label>Admission Status (Optional)</Label>
+            <Label>Status (Optional)</Label>
             <Select onValueChange={(v) => handleSelectChange('admissionStatus', v)} value={formData.admissionStatus}>
               <SelectTrigger>
-                <SelectValue placeholder="Select Admission Status" />
+                <SelectValue placeholder="Select Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Admitted">Admitted</SelectItem>
@@ -232,12 +232,12 @@ const processOCR = async (file: File) => {
           </div>
 
           <div>
-            <Label>Fee (₹) <span className="text-red-500">*</span></Label>
-            <Input type="number" name="fee" value={formData.fee} onChange={handleChange} placeholder="Enter course fee" required />
+            <Label>Cost (₹) <span className="text-red-500">*</span></Label>
+            <Input type="number" name="fee" value={formData.fee} onChange={handleChange} placeholder="Enter Cost" required />
           </div>
 
           <div>
-            <Label>Pre-Demo Date</Label>
+            <Label> Follow-up Date</Label>
             <Input type="date" name="preDemoDate" value={formData.preDemoDate} onChange={handleChange} />
           </div>
 
@@ -286,7 +286,7 @@ const processOCR = async (file: File) => {
 
           {/* Photo Upload with OCR */}
           <div className="md:col-span-2">
-            <Label>Upload Admission Form Photo (Auto Fill)</Label>
+            <Label>Upload Photo (Auto Fill)</Label>
             <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition">
               <label className="cursor-pointer">
                 <Upload className="mx-auto mb-2 text-gray-400" size={40} />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { ChevronDown, ChevronUp, X, Upload, ArrowRightLeft } from 'lucide-react';
 import { toast } from "sonner";
 import TransferModal from '@/app/component/TransferModal';
@@ -11,7 +11,7 @@ type Lead = {
   eqId: string;
   enquiryId: string;
   eqName: string;
-  contact: string;               // ← Already present
+  contact: string;
   course?: string;
   demoDoneBy?: string;
   department?: string;
@@ -56,7 +56,6 @@ export default function PostDemoLeadsTable() {
   const [editForm, setEditForm] = useState<any>({});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
   const [courses, setCourses] = useState<Course[]>([]);
 
   useEffect(() => {
@@ -198,7 +197,7 @@ export default function PostDemoLeadsTable() {
             <th className="px-5 py-4 text-left">ENQUIRY ID</th>
             <th className="px-5 py-4 text-left">NAME</th>
             <th className="px-5 py-4 text-left">COURSE</th>
-            <th className="px-5 py-4 text-left">CONTACT</th>           {/* ← New Column */}
+            <th className="px-5 py-4 text-left">CONTACT</th>
             <th className="px-5 py-4 text-left">DEMO DONE BY</th>
             <th className="px-5 py-4 text-left">POST-DEMO DATE HISTORY</th>
             <th className="px-5 py-4 text-left">STATUS</th>
@@ -210,14 +209,27 @@ export default function PostDemoLeadsTable() {
         <tbody>
           {leads.map((lead) => {
             const isEditing = editingRow === lead._id;
+            const isExpanded = expandedRow === lead._id;
             const historyDates = lead.postDemoDateHistory ||
               (lead.postDemoDate ? [lead.postDemoDate] : []);
 
             return (
-              <>
-                <tr key={lead._id} className="border-b hover:bg-purple-50 transition-all">
-
-                  <td className="px-5 py-4 font-semibold">{lead.enquiryId}</td>
+              <Fragment key={lead._id}> {/* ← Fixed: Using Fragment directly here */}
+                <tr className="border-b hover:bg-purple-50 transition-all">
+                  {/* Enquiry ID + Expand Row Button */}
+                  <td className="px-5 py-4 font-semibold">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => toggleRow(lead._id)} 
+                        className="p-1 hover:bg-gray-200 rounded text-gray-600 transition"
+                        title="Toggle Details"
+                      >
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                      {lead.enquiryId}
+                    </div>
+                  </td>
+                  
                   <td className="px-5 py-4 font-semibold">{lead.eqName}</td>
 
                   {/* Course */}
@@ -244,7 +256,7 @@ export default function PostDemoLeadsTable() {
                     )}
                   </td>
 
-                  {/* Contact Number - New */}
+                  {/* Contact Number */}
                   <td className="px-5 py-4 font-medium text-gray-800">
                     {lead.contact || '—'}
                   </td>
@@ -288,32 +300,31 @@ export default function PostDemoLeadsTable() {
                       formatDate(lead.postDemoDate)
                     )}
                   </td>
-                                      <td className="px-5 py-4">
-            {/* <p className="text-[10px] font-bold uppercase text-gray-400 mb-1">
-              Status
-            </p> */}
 
-            {isEditing ? (
-              <select
-                value={editForm.interested}
-                onChange={(e) =>
-                  setEditForm({
-                    ...editForm,
-                    interested: e.target.value,
-                  })
-                }
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs"
-              >
-                <option value="Hot">Hot</option>
-                <option value="Cold">Cold</option>
-                <option value="Dead">Dead</option>
-              </select>
-            ) : (
-              <span className="px-3 py-1 rounded-xl text-xs font-bold bg-slate-100">
-                {lead.interested || "Not Set"}
-              </span>
-            )}
-          </td>
+                  {/* Status/Interested */}
+                  <td className="px-5 py-4">
+                    {isEditing ? (
+                      <select
+                        value={editForm.interested}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            interested: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs"
+                      >
+                        <option value="Hot">Hot</option>
+                        <option value="Cold">Cold</option>
+                        <option value="Dead">Dead</option>
+                      </select>
+                    ) : (
+                      <span className="px-3 py-1 rounded-xl text-xs font-bold bg-slate-100">
+                        {lead.interested || "Not Set"}
+                      </span>
+                    )}
+                  </td>
+
                   {/* Admission Status */}
                   <td className="px-5 py-4">
                     {isEditing ? (
@@ -424,10 +435,10 @@ export default function PostDemoLeadsTable() {
                   </td>
                 </tr>
 
-                {/* Expanded Row */}
-                {expandedRow === lead._id && (
+                {/* Expanded Row Layout */}
+                {isExpanded && (
                   <tr className="bg-blue-50">
-                    <td colSpan={9} className="p-6">   {/* Updated colSpan */}
+                    <td colSpan={10} className="p-6">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-6 bg-white p-6 rounded-2xl border">
                         <div><strong>City:</strong> {lead.city || '—'}</div>
                         <div><strong>State:</strong> {lead.state || '—'}</div>
@@ -437,7 +448,7 @@ export default function PostDemoLeadsTable() {
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
         </tbody>

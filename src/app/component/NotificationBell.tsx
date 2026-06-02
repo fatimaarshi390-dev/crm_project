@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Bell,
   RefreshCcw,
@@ -32,7 +33,7 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<NotificationData | null>(null);
   const [loading, setLoading] = useState(false);
-
+  const router = useRouter();
   const [dismissed, setDismissed] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set();
 
@@ -316,35 +317,49 @@ export default function NotificationBell() {
                 p-4
               "
             >
-              {visiblePreDemo.length > 0 && (
-                <Section
-                  title="Pre-Demo Follow-ups"
-                  count={visiblePreDemo.length}
-                  gradient="from-blue-500 to-cyan-500"
-                  leads={visiblePreDemo}
-                  onDismiss={handleDismiss}
-                />
-              )}
+           
 
-              {visibleDemo.length > 0 && (
-                <Section
-                  title="Demo Follow-ups"
-                  count={visibleDemo.length}
-                  gradient="from-violet-500 to-purple-500"
-                  leads={visibleDemo}
-                  onDismiss={handleDismiss}
-                />
-              )}
+{visiblePreDemo.length > 0 && (
+  <Section
+    title="Pre-Demo Follow-ups"
+    count={visiblePreDemo.length}
+    gradient="from-blue-500 to-cyan-500"
+    leads={visiblePreDemo}
+    onDismiss={handleDismiss}
+    onNavigate={(status) => {
+      router.replace(`/leads?tab=${status}`);
+      setOpen(false);
+    }}
+  />
+)}
 
-              {visiblePostDemo.length > 0 && (
-                <Section
-                  title="Post-Demo Follow-ups"
-                  count={visiblePostDemo.length}
-                  gradient="from-emerald-500 to-green-500"
-                  leads={visiblePostDemo}
-                  onDismiss={handleDismiss}
-                />
-              )}
+{visibleDemo.length > 0 && (
+  <Section
+    title="Demo Follow-ups"
+    count={visibleDemo.length}
+    gradient="from-violet-500 to-purple-500"
+    leads={visibleDemo}
+    onDismiss={handleDismiss}
+    onNavigate={(status) => {
+      router.replace(`/leads?tab=${status}`);
+      setOpen(false);
+    }}
+  />
+)}
+
+{visiblePostDemo.length > 0 && (
+  <Section
+    title="Post-Demo Follow-ups"
+    count={visiblePostDemo.length}
+    gradient="from-emerald-500 to-green-500"
+    leads={visiblePostDemo}
+    onDismiss={handleDismiss}
+    onNavigate={(status) => {
+      router.replace(`/leads?tab=${status}`);
+      setOpen(false);
+    }}
+  />
+)}
             </div>
           )}
         </div>
@@ -360,53 +375,34 @@ function Section({
   gradient,
   leads,
   onDismiss,
+  onNavigate,
 }: {
   title: string;
   count: number;
   gradient: string;
   leads: Lead[];
   onDismiss: (id: string) => void;
+  onNavigate: (status: string) => void;  // ← NEW
 }) {
-  const [hovered, setHovered] = useState<string | null>(
-    null
-  );
+  const [hovered, setHovered] = useState<string | null>(null);
+
+  // Status determine karo title se
+  const getStatus = () => {
+    if (title.includes('Pre-Demo'))  return 'per-demo-followups';
+    if (title.includes('Demo'))      return 'demo-day-followups';
+    if (title.includes('Post-Demo')) return 'post-demo-followups';
+    return 'Fresh Leads';
+  };
 
   return (
-    <div
-      className="
-        rounded-2xl
-        border
-        border-slate-200
-        bg-white/70
-        p-4
-        shadow-sm
-      "
-    >
+    <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm">
       {/* Title */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-slate-800">
-            {title}
-          </h3>
-
-          <p className="text-xs text-slate-500">
-            Pending leads
-          </p>
+          <h3 className="font-semibold text-slate-800">{title}</h3>
+          <p className="text-xs text-slate-500">Pending leads</p>
         </div>
-
-        <div
-          className={`
-            bg-gradient-to-r
-            ${gradient}
-            text-white
-            text-sm
-            font-bold
-            px-3
-            py-1
-            rounded-full
-            shadow
-          `}
-        >
+        <div className={`bg-gradient-to-r ${gradient} text-white text-sm font-bold px-3 py-1 rounded-full shadow`}>
           {count}
         </div>
       </div>
@@ -417,128 +413,56 @@ function Section({
           <div
             key={lead._id}
             className="relative"
-            onMouseEnter={() =>
-              setHovered(lead._id)
-            }
-            onMouseLeave={() =>
-              setHovered(null)
-            }
+            onMouseEnter={() => setHovered(lead._id)}
+            onMouseLeave={() => setHovered(null)}
           >
-            <div
-              className="
-                group
-                flex
-                items-center
-                justify-between
-                rounded-2xl
-                border
-                border-slate-100
-                bg-slate-50
-                px-4
-                py-3
-                hover:bg-white
-                hover:shadow-md
-                transition-all
-                duration-300
-              "
-            >
+            <div className="group flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 hover:bg-white hover:shadow-md transition-all duration-300">
               <div className="flex items-center gap-3 min-w-0">
                 <input
                   type="checkbox"
-                  className="
-                    h-5
-                    w-5
-                    rounded
-                    accent-green-500
-                    cursor-pointer
-                  "
-                  onChange={() =>
-                    onDismiss(lead._id)
-                  }
+                  className="h-5 w-5 rounded accent-green-500 cursor-pointer"
+                  onChange={() => onDismiss(lead._id)}
                 />
 
+                {/* ← Name click pe navigate */}
                 <div className="min-w-0">
                   <p
-                    className="
-                      text-sm
-                      font-semibold
-                      text-slate-800
-                      truncate
-                    "
+                    onClick={() => onNavigate(getStatus())}
+                    className="text-sm font-semibold text-slate-800 truncate cursor-pointer hover:text-blue-600 hover:underline transition-colors"
                   >
                     {lead.eqName}
                   </p>
-
-                  {/* <p className="text-xs text-slate-500">
-                    ID: {lead.eqId}
-                  </p> */}
                 </div>
               </div>
 
-              <div
-                className="
-                  h-10
-                  w-10
-                  rounded-xl
-                  bg-slate-100
-                  flex
-                  items-center
-                  justify-center
-                  group-hover:scale-110
-                  transition
-                "
-              >
-                <Phone
-                  size={16}
-                  className="text-slate-600"
-                />
+              <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center group-hover:scale-110 transition">
+                <Phone size={16} className="text-slate-600" />
               </div>
             </div>
 
             {/* Tooltip */}
             {hovered === lead._id && (
-              <div
-                className="
-                  absolute
-                  left-0
-                  top-full
-                  mt-2
-                  z-50
-                  w-72
-                  rounded-2xl
-                  border
-                  border-white/20
-                  bg-white/95
-                  backdrop-blur-xl
-                  p-4
-                  shadow-2xl
-                  animate-in
-                  fade-in
-                  zoom-in-95
-                "
-              >
+              <div className="absolute left-0 top-full mt-2 z-50 w-72 rounded-2xl border border-white/20 bg-white/95 backdrop-blur-xl p-4 shadow-2xl animate-in fade-in zoom-in-95">
                 <div className="space-y-3">
                   <div>
-                    <p className="font-bold text-slate-800">
-                      {lead.eqName}
-                    </p>
-
-                    {/* <p className="text-xs text-slate-500">
-                      Employee ID: {lead.eqId}
-                    </p> */}
+                    <p className="font-bold text-slate-800">{lead.eqName}</p>
                   </div>
-
                   <div className="flex items-center gap-2 text-blue-600 text-sm">
                     <Phone size={14} />
                     {lead.contact}
                   </div>
-
                   {lead.course && (
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <GraduationCap size={15} />
                       {lead.course}
                     </div>
                   )}
+                  <button
+                    onClick={() => onNavigate(getStatus())}
+                    className="w-full mt-2 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+                  >
+                    Go to Lead →
+                  </button>
                 </div>
               </div>
             )}

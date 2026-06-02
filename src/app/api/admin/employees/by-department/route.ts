@@ -12,24 +12,30 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const department = searchParams.get('department') || currentUser.department;
+    const department = searchParams.get('department') || '';
+    const division = searchParams.get('division') || '';
+    const role = searchParams.get('role') || '';
 
-    const employees = await User.find({
-  department,
-  isActive: true,
-  employeeId: { $ne: currentUser.employeeId },
-  role: { $nin: ['marketing', 'admin'] }  // ← exclude marketing and admin
-})
-.select('employeeId name department role')
-.lean();
+    const query: any = {
+      isActive: true,
+      employeeId: { $ne: currentUser.employeeId },
+      role: { $nin: ['marketing', 'admin'] }
+    };
+
+    if (department) query.department = { $regex: department, $options: 'i' };
+    if (role) query.role = { $regex: role, $options: 'i' };
+
+    // division is stored on user? If yes add:
+    // if (division) query.division = { $regex: division, $options: 'i' };
+
+    const employees = await User.find(query)
+      .select('employeeId name department role')
+      .lean();
 
     return NextResponse.json({ success: true, data: employees });
 
   } catch (error: any) {
     console.error(error);
-    return NextResponse.json(
-      { success: false, message: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }

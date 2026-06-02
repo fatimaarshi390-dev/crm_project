@@ -8,12 +8,13 @@ import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle
+  CardTitle,
+  CardDescription
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Edit3, AlertCircle } from 'lucide-react';
-import { useUser } from '@/app/component/context/user-context';   // ← Required for Admin Check
+import { Edit3, Search, X, CheckCircle2, ShieldAlert, CreditCard, BookOpen, Phone, Calendar } from 'lucide-react';
+import { useUser } from '@/app/component/context/user-context';
 
 type Lead = {
   _id: string;
@@ -34,8 +35,9 @@ type Installment = {
 
 export default function AdmissionForm() {
   const { user } = useUser();
+  const isAdmin = user?.role === 'admin';
 
-  // ── Search state ──
+  // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Lead[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -61,7 +63,7 @@ export default function AdmissionForm() {
   const [paidDates, setPaidDates] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState(false);
 
-  // ── Close dropdown on outside click ──
+  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -72,7 +74,7 @@ export default function AdmissionForm() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ── Debounced search ──
+  // Debounced search
   useEffect(() => {
     if (searchQuery.trim().length < 2) {
       setSearchResults([]);
@@ -83,32 +85,27 @@ export default function AdmissionForm() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-const searchLeads = async (query: string) => {
-  setSearchLoading(true);
-  try {
-    // Changed: Removed strict status=admission to get better results
-    const res = await fetch(
-      `/api/leads?search=${encodeURIComponent(query)}`
-    );
-    const data = await res.json();
-    
-    if (data.success) {
-      // Filter only admitted leads on frontend for better UX
-      const admittedLeads = (data.data || []).filter((lead: any) => 
-        lead.status === 'admission' || lead.admissionStatus === 'Admitted'
-      );
+  const searchLeads = async (query: string) => {
+    setSearchLoading(true);
+    try {
+      const res = await fetch(`/api/leads?search=${encodeURIComponent(query)}`);
+      const data = await res.json();
       
-      setSearchResults(admittedLeads);
-      setShowDropdown(true);
+      if (data.success) {
+        const admittedLeads = (data.data || []).filter((lead: any) => 
+          lead.status === 'admission' || lead.admissionStatus === 'Admitted'
+        );
+        setSearchResults(admittedLeads);
+        setShowDropdown(true);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Search failed');
+    } finally {
+      setSearchLoading(false);
     }
-  } catch (error) {
-    console.error(error);
-    toast.error('Search failed');
-  } finally {
-    setSearchLoading(false);
-  }
-};
-  // ── Load existing admission ──
+  };
+
   const loadExistingAdmission = async (eqId: string) => {
     try {
       const res = await fetch(`/api/admissions?eqId=${eqId}`);
@@ -162,7 +159,6 @@ const searchLeads = async (query: string) => {
     setIsEditing(false);
   };
 
-  // ── Select lead from search results ──
   const handleLeadSelect = (lead: Lead) => {
     setSelectedLead(lead);
     setSearchQuery(`${lead.eqName}${lead.contact ? ' - ' + lead.contact : ''}`);
@@ -186,11 +182,8 @@ const searchLeads = async (query: string) => {
     resetForm();
   };
 
-  // ── Handle top fields with Auto Cap (Admin Bypass) ──
   const handleChange = (field: string, value: string) => {
     let updated = { ...formData, [field]: value };
-
-    const isAdmin = user?.role === 'admin';
 
     if (field === 'discountPercent' && !isAdmin) {
       let discount = parseFloat(value) || 0;
@@ -210,7 +203,6 @@ const searchLeads = async (query: string) => {
       updated.noOfInstallments = count.toString();
     }
 
-    // Recalculate After Discount
     if (field === 'fee' || field === 'discountPercent') {
       const fee = parseFloat(updated.fee) || 0;
       const discountPercent = parseFloat(updated.discountPercent) || 0;
@@ -220,14 +212,12 @@ const searchLeads = async (query: string) => {
     setFormData(updated);
   };
 
-  // ── Auto generate installments ──
   useEffect(() => {
     if (isExistingRecord) return;
 
     const totalAmount = parseFloat(formData.discountAmount) || 0;
     let count = parseInt(formData.noOfInstallments) || 0;
 
-    const isAdmin = user?.role === 'admin';
     if (!isAdmin && count > 5) count = 5;
 
     if (count > 0 && totalAmount > 0) {
@@ -274,10 +264,7 @@ const searchLeads = async (query: string) => {
   };
 
   const handleInstallmentChange = (index: number, value: string) => {
-    if (
-      installmentPaid[index] ||
-      (index === installments.length - 1 && isMoreThanHalfPaid)
-    ) {
+    if (installmentPaid[index] || (index === installments.length - 1 && isMoreThanHalfPaid)) {
       return;
     }
 
@@ -302,16 +289,12 @@ const searchLeads = async (query: string) => {
     }
 
     if (editableIndexes.length > 0) {
-      const equalAmount = Number(
-        (remainingAmount / editableIndexes.length).toFixed(2)
-      );
+      const equalAmount = Number((remainingAmount / editableIndexes.length).toFixed(2));
       editableIndexes.forEach(i => {
         updatedInstallments[i].amount = equalAmount;
       });
 
-      const finalTotal = updatedInstallments.reduce(
-        (sum, item) => sum + item.amount, 0
-      );
+      const finalTotal = updatedInstallments.reduce((sum, item) => sum + item.amount, 0);
       const diff = Number((totalAmount - finalTotal).toFixed(2));
       updatedInstallments[editableIndexes[editableIndexes.length - 1]].amount += diff;
     }
@@ -319,7 +302,6 @@ const searchLeads = async (query: string) => {
     setInstallments(updatedInstallments);
   };
 
-  // ── Submit ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.id) {
@@ -352,11 +334,7 @@ const searchLeads = async (query: string) => {
 
       const data = await res.json();
       if (data.success) {
-        toast.success(
-          isExistingRecord
-            ? 'Admission Updated!'
-            : 'Admission Saved Successfully!'
-        );
+        toast.success(isExistingRecord ? 'Admission Updated!' : 'Admission Saved Successfully!');
       } else {
         toast.error(data.message);
       }
@@ -366,246 +344,318 @@ const searchLeads = async (query: string) => {
   };
 
   return (
-    <Card className="max-w-5xl mx-auto my-8 shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold">Admission Form</CardTitle>
-      </CardHeader>
+    <div className="w-full max-w-5xl mx-auto py-10 px-4 sm:px-6">
+      <Card className="shadow-xl border border-gray-150/80 overflow-hidden bg-white rounded-2xl">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-100 p-6 sm:p-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
+                Sales Ledger
+              </CardTitle>
+              <CardDescription className="text-gray-500 mt-1">
+                Process leads details, configure active discounts, and schedule dynamic installments.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
 
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <CardContent className="p-6 sm:p-8 space-y-8">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            
+            {/* ── Search Bar Section ── */}
+            <div className="relative space-y-2 bg-slate-50/50 p-4 rounded-xl border border-dashed border-gray-200" ref={dropdownRef}>
+              <Label className="text-xs font-bold tracking-wider text-gray-500 uppercase flex items-center gap-2">
+                <Search className="h-3.5 w-3.5 text-blue-500" />
+                Find Admitted Lead *
+              </Label>
+              <div className="relative mt-1">
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSearchQuery(val);
+                    if (selectedLead) {
+                      setSelectedLead(null);
+                      resetForm();
+                    }
+                  }}
+                  placeholder="Type student name or phone number..."
+                  className="pr-10 h-11 rounded-xl shadow-sm border-gray-200 focus-visible:ring-blue-500"
+                />
 
-          {/* Search Bar */}
-          <div className="relative" ref={dropdownRef}>
-            <Label>Search by Name or Phone *</Label>
-            <div className="relative mt-1">
-              <Input
-                value={searchQuery}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSearchQuery(val);
-                  if (selectedLead) {
-                    setSelectedLead(null);
-                    resetForm();
-                  }
-                }}
-                placeholder="Type name or phone number (min 2 chars)..."
-                className="pr-10"
-              />
+                {searchLoading && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
 
-              {searchLoading && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <div className="h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                {(searchQuery || selectedLead) && !searchLoading && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 bg-gray-100 p-1 rounded-full transition-colors duration-150"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown Menu */}
+              {showDropdown && (
+                <div className="absolute left-0 right-0 z-50 mt-1 bg-white border border-gray-200/90 rounded-xl shadow-xl max-h-64 overflow-y-auto divide-y divide-gray-50">
+                  {searchResults.length > 0 ? (
+                    searchResults.map((lead) => (
+                      <button
+                        key={lead._id}
+                        type="button"
+                        onClick={() => handleLeadSelect(lead)}
+                        className="w-full text-left px-4 py-3 hover:bg-blue-50/60 transition-colors flex items-center justify-between gap-4"
+                      >
+                        <div className="space-y-1">
+                          <p className="font-semibold text-gray-800 text-sm">{lead.eqName}</p>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                            {lead.contact && (
+                              <span className="flex items-center gap-1">
+                                <Phone className="h-3 w-3" /> {lead.contact}
+                              </span>
+                            )}
+                            {(lead.course || lead.software) && (
+                              <span className="flex items-center gap-1 text-blue-600 font-medium">
+                                <BookOpen className="h-3 w-3" /> {lead.course || lead.software}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono bg-gray-100 px-2 py-1 rounded text-gray-400 shrink-0">
+                          ID: {lead.eqId}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-4 text-center text-sm text-gray-400 flex items-center justify-center gap-2">
+                      <ShieldAlert className="h-4 w-4 text-gray-300" />
+                      No admitted leads matched "{searchQuery}"
+                    </div>
+                  )}
                 </div>
               )}
 
-              {(searchQuery || selectedLead) && !searchLoading && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 text-lg leading-none"
-                >
-                  ✕
-                </button>
+              {/* Selected Badge Showcase */}
+              {selectedLead && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="text-sm font-bold text-emerald-800">
+                    {selectedLead.eqName}
+                  </span>
+                  {selectedLead.contact && (
+                    <span className="text-xs text-emerald-600 font-medium">
+                      ({selectedLead.contact})
+                    </span>
+                  )}
+                  <div className="ml-auto flex items-center gap-2">
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-mono px-2 py-0.5 rounded">
+                      {selectedLead.eqId}
+                    </span>
+                    {isExistingRecord && (
+                      <span className="text-[10px] font-semibold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                        Existing Record
+                      </span>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 
-            {showDropdown && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-64 overflow-y-auto">
-                {searchResults.length > 0 ? (
-                  searchResults.map((lead) => (
-                    <button
-                      key={lead._id}
-                      type="button"
-                      onClick={() => handleLeadSelect(lead)}
-                      className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b last:border-b-0 transition-colors"
-                    >
-                      <p className="font-medium text-gray-800">{lead.eqName}</p>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        {lead.contact && (
-                          <span className="text-sm text-gray-500">
-                            📞 {lead.contact}
-                          </span>
-                        )}
-                        {(lead.course || lead.software) && (
-                          <span className="text-xs text-blue-500">
-                            {lead.course || lead.software}
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-300 ml-auto">
-                          {lead.eqId}
-                        </span>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-4 py-3 text-sm text-gray-400">
-                    No admitted leads found for "{searchQuery}"
+            {/* ── Core Ledger Fields ── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-gray-700"> Name</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => handleChange('name', e.target.value)}
+                  className="rounded-xl border-gray-200"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-gray-700">Course / Software Specified</Label>
+                <Input
+                  value={formData.courseOrSoftware}
+                  onChange={(e) => handleChange('courseOrSoftware', e.target.value)}
+                  placeholder="Course or platform scope"
+                  className="rounded-xl border-gray-200"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-gray-700">Base Cost (₹)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span>
+                  <Input
+                    type="number"
+                    value={formData.fee}
+                    onChange={(e) => handleChange('fee', e.target.value)}
+                    className="pl-7 rounded-xl border-gray-200 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <Label className="text-sm font-medium text-gray-700">Discount Cap (%)</Label>
+                  {!isAdmin && <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">Max 10%</span>}
+                </div>
+                <Input
+                  type="number"
+                  value={formData.discountPercent}
+                  onChange={(e) => handleChange('discountPercent', e.target.value)}
+                  className="rounded-xl border-gray-200"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-gray-700">Net Cost (After Discount)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">₹</span>
+                  <Input
+                    value={formData.discountAmount}
+                    readOnly
+                    className="pl-7 rounded-xl bg-gray-50 border-gray-200 font-bold text-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <Label className="text-sm font-medium text-gray-700">Installment Count</Label>
+                  {!isAdmin && <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">Max 5 Parts</span>}
+                </div>
+                <Input
+                  type="number"
+                  min="1"
+                  value={formData.noOfInstallments}
+                  onChange={(e) => handleChange('noOfInstallments', e.target.value)}
+                  className="rounded-xl border-gray-200"
+                />
+              </div>
+            </div>
+
+            {/* ── Installment Management Grid ── */}
+            {installments.length > 0 && (
+              <div className="border-t border-gray-100 pt-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-bold tracking-tight text-gray-900 flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-indigo-500" />
+                      Structured Schedules
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Manage transaction receipts and dynamic amount balancing panels.</p>
                   </div>
-                )}
-              </div>
-            )}
+                  <Button
+                    type="button"
+                    variant={isEditing ? 'default' : 'outline'}
+                    onClick={() => setIsEditing(!isEditing)}
+                    className={`rounded-xl h-9 text-xs font-semibold shadow-sm transition-all duration-200 ${
+                      isEditing ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <Edit3 className="h-3.5 w-3.5 mr-1.5" />
+                    {isEditing ? 'Lock Structural Modifications' : 'Unlock Custom Modifiers'}
+                  </Button>
+                </div>
 
-            {selectedLead && (
-              <div className="mt-2 flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                <span className="text-green-500 text-base">✓</span>
-                <span className="text-sm font-semibold text-green-700">
-                  {selectedLead.eqName}
-                </span>
-                {selectedLead.contact && (
-                  <span className="text-xs text-green-500">
-                    {selectedLead.contact}
-                  </span>
-                )}
-                <span className="text-xs text-gray-400 ml-auto">
-                  {selectedLead.eqId}
-                </span>
-                {isExistingRecord && (
-                  <span className="text-xs bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full">
-                    Existing Record
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {installments.map((item, index) => {
+                    const isLast = index === installments.length - 1;
+                    const isPaid = installmentPaid[index];
+                    const shouldDisable = isPaid || (isLast && isMoreThanHalfPaid);
 
-          {/* Main Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label>Name</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => handleChange('name', e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>Course / Software</Label>
-              <Input
-                value={formData.courseOrSoftware}
-                onChange={(e) => handleChange('courseOrSoftware', e.target.value)}
-                className="mt-1"
-                placeholder="Course or Software Name"
-              />
-            </div>
-            <div>
-              <Label>Fee (₹)</Label>
-              <Input
-                type="number"
-                value={formData.fee}
-                onChange={(e) => handleChange('fee', e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>Discount % {user?.role !== 'admin' && <span className="text-red-500">(Max 10%)</span>}</Label>
-              <Input
-                type="number"
-                value={formData.discountPercent}
-                onChange={(e) => handleChange('discountPercent', e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>After Discount</Label>
-              <Input
-                value={formData.discountAmount}
-                readOnly
-                className="mt-1 bg-gray-100 font-bold"
-              />
-            </div>
-            <div>
-              <Label>No. Of Installments {user?.role !== 'admin' && <span className="text-red-500">(Max 5)</span>}</Label>
-              <Input
-                type="number"
-                min="1"
-                value={formData.noOfInstallments}
-                onChange={(e) => handleChange('noOfInstallments', e.target.value)}
-                className="mt-1"
-              />
-            </div>
-          </div>
+                    return (
+                      <div
+                        key={index}
+                        className={`group relative border rounded-xl p-4 transition-all duration-200 bg-white ${
+                          isPaid 
+                            ? 'border-emerald-200 bg-emerald-50/10 shadow-sm' 
+                            : shouldDisable 
+                            ? 'border-gray-200 bg-gray-50/50 opacity-80' 
+                            : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                        }`}
+                      >
+                        {/* Card Upper Actions Row */}
+                        <div className="flex items-center justify-between gap-2 border-b border-gray-100/80 pb-2.5 mb-3">
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <Checkbox
+                              checked={isPaid}
+                              onCheckedChange={() => togglePaid(index)}
+                              className="rounded border-gray-300 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                            />
+                            <span className={`text-xs font-semibold ${isPaid ? 'text-emerald-700' : 'text-gray-500'}`}>
+                              {isPaid ? 'Payment Received' : 'Pending Receipt'}
+                            </span>
+                          </label>
 
-          {/* Installments Section */}
-          {installments.length > 0 && (
-            <div className="border-t pt-6">
-              <div className="flex justify-between items-center mb-5">
-                <h2 className="text-xl font-semibold">Installments</h2>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsEditing(!isEditing)}
-                >
-                  <Edit3 className="h-4 w-4 mr-2" />
-                  {isEditing ? 'Editing Enabled' : 'Modify'}
-                </Button>
-              </div>
+                          {paidDates[index] && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                              <Calendar className="h-2.5 w-2.5" /> {paidDates[index]}
+                            </span>
+                          )}
+                        </div>
 
-              <div className="space-y-4">
-                {installments.map((item, index) => {
-                  const isLast = index === installments.length - 1;
-                  const isPaid = installmentPaid[index];
-                  const shouldDisable = isPaid || (isLast && isMoreThanHalfPaid);
-
-                  return (
-                    <div
-                      key={index}
-                      className="border rounded-xl p-5 bg-white shadow-sm"
-                    >
-                      <div className="flex items-center gap-3 mb-3">
-                        <Checkbox
-                          checked={isPaid}
-                          onCheckedChange={() => togglePaid(index)}
-                        />
-                        <span className="text-sm font-medium">Mark as Paid</span>
-                        {paidDates[index] && (
-                          <span className="ml-auto text-green-600 text-xs">
-                            Paid: {paidDates[index]}
+                        {/* Amount Configuration Input */}
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                            Installment #{index + 1}
                           </span>
+                          <div className="relative mt-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">₹</span>
+                            <Input
+                              type="number"
+                              value={item.amount}
+                              disabled={!isEditing || shouldDisable}
+                              onChange={(e) => handleInstallmentChange(index, e.target.value)}
+                              className={`pl-6 rounded-lg text-sm h-9 border-gray-200 font-mono font-bold ${
+                                !isEditing || shouldDisable
+                                  ? 'bg-slate-100/80 text-gray-500 cursor-not-allowed border-gray-100 shadow-none'
+                                  : 'text-gray-800 focus:ring-indigo-500 focus:border-indigo-500'
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Status Notice Badges */}
+                        {isPaid && (
+                          <p className="text-[10px] font-semibold text-emerald-600 mt-2 flex items-center gap-1">
+                            ✓ Balance cleared safely.
+                          </p>
+                        )}
+                        {!isPaid && shouldDisable && (
+                          <p className="text-[10px] font-medium text-amber-600 mt-2 bg-amber-50 p-1 rounded border border-amber-100/60">
+                            ⚠️ Automated Lock (Over 50% paid).
+                          </p>
                         )}
                       </div>
-
-                      <Label>Installment {index + 1}</Label>
-                      <Input
-                        type="number"
-                        value={item.amount}
-                        disabled={!isEditing || shouldDisable}
-                        onChange={(e) =>
-                          handleInstallmentChange(index, e.target.value)
-                        }
-                        className={`mt-2 ${
-                          !isEditing || shouldDisable
-                            ? 'bg-gray-200 cursor-not-allowed'
-                            : ''
-                        }`}
-                      />
-
-                      {isPaid && (
-                        <p className="text-xs text-green-600 mt-2">
-                          Installment Paid
-                        </p>
-                      )}
-                      {!isPaid && shouldDisable && (
-                        <p className="text-xs text-red-500 mt-2">
-                          Last installment locked (50%+ paid)
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <Button
-            type="submit"
-            className="w-full py-6 text-lg bg-green-600 hover:bg-green-700"
-          >
-            {isExistingRecord
-              ? 'Update Admission Record'
-              : 'Save New Admission Record'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+            {/* ── Submission Dispatch Grid Row ── */}
+            <div className="pt-4 border-t border-gray-100">
+              <Button
+                type="submit"
+                className={`w-full py-6 rounded-xl font-bold text-base shadow-md transform active:scale-[0.99] transition-all duration-150 ${
+                  isExistingRecord
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                }`}
+              >
+                {isExistingRecord ? 'Update Sales Ledger Record' : 'Commit New Sales Ledger Record'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

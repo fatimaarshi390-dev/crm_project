@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
+import { Suspense } from 'react'; 
 import { useUser } from '../../component/context/user-context';
-
+import { useSearchParams } from 'next/navigation';
 import DemoDayLeadsTable from '@/app/component/DemoLeadsTable';
 import Sidebar from '@/app/component/Sidebar';
 import EnquiryTable from '../../component/EnquiryTable';
@@ -25,18 +25,23 @@ import {
   Users,
   GraduationCap,
   Sparkles,
+  IndianRupee,
 } from 'lucide-react';
 import NotificationBell from '@/app/component/NotificationBell';
 import Header from '@/app/component/header';
+import { FaRupeeSign } from 'react-icons/fa';
 
 
-export default function LeadsDashboard() {
+ function LeadsDashboard() {
   const { user } = useUser();
 
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeTab, setActiveTab] = useState('Fresh Leads');
+  const searchParams = useSearchParams();
+const [activeTab, setActiveTab] = useState(
+  searchParams.get('tab') || 'Fresh Leads'
+);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -75,7 +80,12 @@ export default function LeadsDashboard() {
       fetchLeads('admission');
     }
   }, [activeTab]);
-
+useEffect(() => {
+  const tab = searchParams.get('tab');
+  if (tab) {
+    setActiveTab(tab);
+  }
+}, [searchParams]);
   const tabs = [
     {
       value: 'Fresh Leads',
@@ -95,12 +105,12 @@ export default function LeadsDashboard() {
     {
       value: 'post-demo-followups',
       label: 'Post-Demo follow-up',
-      icon: <GraduationCap size={16} />,
+      icon: <Users size={16} />,
     },
     {
       value: 'addmission',
-      label: 'Admission',
-      icon: <GraduationCap size={16} />,
+      label: 'Installment Form',
+      icon: <IndianRupee size={16} />,
     },
     {
       value: 'organic-leads',
@@ -129,21 +139,21 @@ return (
     </div>
 
     {/* MOBILE MENU BUTTON */}
-    <button
+    {/* <button
       onClick={() => setSidebarOpen(true)}
       className="
         lg:hidden
         fixed top-4 left-4 z-50
         h-11 w-11
         rounded-2xl
-        bg-black
+       
         text-white
         shadow-xl
         flex items-center justify-center
       "
     >
       <Menu size={20} />
-    </button>
+    </button> */}
 
     {/* MOBILE SIDEBAR */}
     {sidebarOpen && (
@@ -289,9 +299,10 @@ return (
           "
         >
           <Tabs.Root
-            defaultValue="Fresh Leads"
-            onValueChange={setActiveTab}
-          >
+  value={activeTab}
+  defaultValue="Fresh Leads"
+  onValueChange={setActiveTab}
+>
             {/* TAB HEADER */}
             <div
               className="
@@ -399,4 +410,11 @@ return (
     </main>
   </div>
 );
+}
+export default function Page() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LeadsDashboard />
+    </Suspense>
+  );
 }
