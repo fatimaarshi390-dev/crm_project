@@ -378,7 +378,7 @@ const deleteRole = async (id: string, roleName: string) => {
 </div>
             {/* Division */}
             <div className="col-span-2 md:col-span-1">
-              <Label>Division <span className="text-red-500">*</span></Label>
+              <Label>Department <span className="text-red-500">*</span></Label>
               <Select 
                 value={formData.division} 
                 onValueChange={(value) => setFormData({ ...formData, division: value })}
@@ -399,7 +399,7 @@ const deleteRole = async (id: string, roleName: string) => {
 
             {/* Department */}
             <div className="col-span-2">
-              <Label>Department <span className="text-red-500">*</span></Label>
+              <Label>Division<span className="text-red-500">*</span></Label>
               <Select 
                 value={formData.department} 
                 onValueChange={(value) => setFormData({ ...formData, department: value })}

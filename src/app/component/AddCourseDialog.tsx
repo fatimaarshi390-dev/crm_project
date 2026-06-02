@@ -36,17 +36,20 @@ interface Course {
   isActive: boolean;
 }
 
-interface Department {
-  _id: string;
-  name: string;
-  code: string;
-}
 interface Division {
   _id: string;
   divisionName: string;
   departmentName: string;
   isActive: boolean;
 }
+
+interface Department {
+  _id: string;
+  name: string;
+  code: string;
+  isActive?: boolean;
+}
+
 interface Teacher {
   _id: string;
   name: string;
@@ -58,21 +61,24 @@ export default function AddCourseDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
- const [divisions, setDivisions] = useState<Division[]>([]);
+  const [showTable, setShowTable] = useState(true);
+
+  const [divisions, setDivisions] = useState<Division[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [showTable, setShowTable] = useState(true);
 
-const [formData, setFormData] = useState({
-  name: "",
-  duration: "",
-  division: "",
-  department: "",
-  syllabus: "",
-  faculty: "",
-  fee: "",
-});
+  const [filteredDivisions, setFilteredDivisions] = useState<Division[]>([]);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    duration: "",
+    division: "",
+    department: "",
+    syllabus: "",
+    faculty: "",
+    fee: "",
+  });
 
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
 
@@ -80,9 +86,9 @@ const [formData, setFormData] = useState({
   useEffect(() => {
     if (open) {
       fetchDepartments();
+      fetchDivisions();
       fetchTeachers();
       fetchCourses();
-      fetchDivisions();
     }
   }, [open]);
 
@@ -97,24 +103,22 @@ const [formData, setFormData] = useState({
       toast.error("Failed to load departments");
     }
   };
+
   const fetchDivisions = async () => {
     try {
       const res = await fetch('/api/division');
       const data = await res.json();
-      if (data.success) {
-        setDivisions(data.data || []);
-      }
+      if (data.success) setDivisions(data.data || []);
     } catch (error) {
-      toast.error("Failed to load departments");
+      toast.error("Failed to load division");
     }
   };
+
   const fetchTeachers = async () => {
     try {
       const res = await fetch('/api/teachers');
       const data = await res.json();
-      if (data.success) {
-        setTeachers(data.data || []);
-      }
+      if (data.success) setTeachers(data.data || []);
     } catch (error) {
       toast.error("Failed to load teachers");
     }
@@ -124,13 +128,34 @@ const [formData, setFormData] = useState({
     try {
       const res = await fetch('/api/courses');
       const data = await res.json();
-      if (data.success) {
-        setCourses(data.data || []);
-      }
+      if (data.success) setCourses(data.data || []);
     } catch (error) {
       toast.error("Failed to load courses");
     }
   };
+
+  // Cascading Logic: Department → Division
+  useEffect(() => {
+    if (formData.department) {
+      const matchedDivisions = divisions.filter(
+        (div) => div.departmentName === formData.department
+      );
+      setFilteredDivisions(matchedDivisions);
+
+      // Auto select first division if only one
+      if (matchedDivisions.length === 1) {
+        setFormData((prev) => ({
+          ...prev,
+          division: matchedDivisions[0].divisionName,
+        }));
+      } else {
+        setFormData((prev) => ({ ...prev, division: "" }));
+      }
+    } else {
+      setFilteredDivisions([]);
+      setFormData((prev) => ({ ...prev, division: "" }));
+    }
+  }, [formData.department, divisions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,7 +163,9 @@ const [formData, setFormData] = useState({
 
     try {
       const method = editingCourse ? 'PATCH' : 'POST';
-      const url = editingCourse ? `/api/courses/${editingCourse._id}` : '/api/courses';
+      const url = editingCourse 
+        ? `/api/courses/${editingCourse._id}` 
+        : '/api/courses';
 
       const res = await fetch(url, {
         method,
@@ -162,33 +189,31 @@ const [formData, setFormData] = useState({
     }
   };
 
- const resetForm = () => {
-  setFormData({
-    name: "",
-    duration: "",
-    division: "",
-    department: "",
-    syllabus: "",
-    faculty: "",
-    fee: "",
-  });
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      duration: "",
+      division: "",
+      department: "",
+      syllabus: "",
+      faculty: "",
+      fee: "",
+    });
+    setEditingCourse(null);
+  };
 
-  setEditingCourse(null);
-};
-
- const handleEdit = (course: Course) => {
-  setEditingCourse(course);
-
-  setFormData({
-    name: course.name,
-    duration: course.duration,
-    division: "",
-    department: course.department,
-    syllabus: course.syllabus,
-    faculty: course.faculty,
-    fee: course.fee,
-  });
-};
+  const handleEdit = (course: Course) => {
+    setEditingCourse(course);
+    setFormData({
+      name: course.name,
+      duration: course.duration,
+      division: course.division || "",
+      department: course.department,
+      syllabus: course.syllabus,
+      faculty: course.faculty,
+      fee: course.fee,
+    });
+  };
 
   const deleteCourse = async (id: string, name: string) => {
     if (!confirm(`Delete course "${name}"?`)) return;
@@ -246,10 +271,10 @@ const [formData, setFormData] = useState({
                 required
               />
             </div>
-              <div>
+            <div>
               <Label>Fee <span className="text-red-500">*</span></Label>
               <Input
-                placeholder="e.g. Course Fee"
+                placeholder="e.g. 15000"
                 value={formData.fee}
                 onChange={(e) => setFormData({ ...formData, fee: e.target.value })}
                 required
@@ -258,15 +283,16 @@ const [formData, setFormData] = useState({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Department Dropdown (Main) */}
             <div>
-              <Label>Division <span className="text-red-500">*</span></Label>
+              <Label>Department <span className="text-red-500">*</span></Label>
               <Select 
                 value={formData.department} 
                 onValueChange={(value) => setFormData({ ...formData, department: value })}
                 required
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Division" />
+                  <SelectValue placeholder="Select Department" />
                 </SelectTrigger>
                 <SelectContent>
                   {departments.map((dept) => (
@@ -277,26 +303,33 @@ const [formData, setFormData] = useState({
                 </SelectContent>
               </Select>
             </div>
-             <div>
-            <Label>Department <span className="text-red-500">*</span></Label>
-            <Select 
-              value={formData.division} 
-              onValueChange={(value) => setFormData({ ...formData, division: value })}
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Department" />
-              </SelectTrigger>
-              <SelectContent>
-                {divisions.map((div) => (
-                  <SelectItem key={div._id} value={div.divisionName}>
-                    {div.divisionName} ({div.departmentName})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-            {/* ==================== TEACHER DROPDOWN ==================== */}
+
+            {/* Division Dropdown (Cascading from Department) */}
+            <div>
+              <Label>Division <span className="text-red-500">*</span></Label>
+              <Select 
+                value={formData.division} 
+                onValueChange={(value) => setFormData({ ...formData, division: value })}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Division" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredDivisions.length > 0 ? (
+                    filteredDivisions.map((div) => (
+                      <SelectItem key={div._id} value={div.divisionName}>
+                        {div.divisionName}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>Select Department first</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Faculty / Trainer */}
             <div>
               <Label>Faculty / Trainer <span className="text-red-500">*</span></Label>
               <Select 
@@ -308,15 +341,11 @@ const [formData, setFormData] = useState({
                   <SelectValue placeholder="Select Teacher" />
                 </SelectTrigger>
                 <SelectContent>
-                  {teachers.length > 0 ? (
-                    teachers.map((teacher) => (
-                      <SelectItem key={teacher._id} value={teacher.name}>
-                        {teacher.name} ({teacher.specialization})
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="" disabled>No teachers available</SelectItem>
-                  )}
+                  {teachers.map((teacher) => (
+                    <SelectItem key={teacher._id} value={teacher.name}>
+                      {teacher.name} ({teacher.specialization})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -334,7 +363,11 @@ const [formData, setFormData] = useState({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { setOpen(false); resetForm(); }}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => { setOpen(false); resetForm(); }}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
@@ -343,9 +376,8 @@ const [formData, setFormData] = useState({
           </DialogFooter>
         </form>
 
-        {/* Course Table - Same as before */}
+        {/* Table Section */}
         <div className="border-t pt-6 mt-6">
-         <div className="border-t pt-6 mt-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold text-lg">All Courses ({courses.length})</h3>
             <Button
@@ -366,6 +398,7 @@ const [formData, setFormData] = useState({
                   <tr>
                     <th className="px-4 py-3 text-left">Course Name</th>
                     <th className="px-4 py-3 text-left">Duration</th>
+                    <th className="px-4 py-3 text-left">Department</th>
                     <th className="px-4 py-3 text-left">Division</th>
                     <th className="px-4 py-3 text-left">Faculty</th>
                     <th className="px-4 py-3 text-center">Actions</th>
@@ -377,21 +410,13 @@ const [formData, setFormData] = useState({
                       <td className="px-4 py-3 font-medium">{course.name}</td>
                       <td className="px-4 py-3">{course.duration}</td>
                       <td className="px-4 py-3">{course.department}</td>
+                      <td className="px-4 py-3">{course.division || '—'}</td>
                       <td className="px-4 py-3">{course.faculty}</td>
                       <td className="px-4 py-3 text-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(course)}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(course)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => deleteCourse(course._id, course.name)}
-                          disabled={actionId === course._id}
-                        >
+                        <Button variant="destructive" size="sm" onClick={() => deleteCourse(course._id, course.name)} disabled={actionId === course._id}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </td>
@@ -399,7 +424,7 @@ const [formData, setFormData] = useState({
                   ))}
                   {courses.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center py-12 text-gray-500">
+                      <td colSpan={6} className="text-center py-12 text-gray-500">
                         No courses found
                       </td>
                     </tr>
@@ -408,7 +433,6 @@ const [formData, setFormData] = useState({
               </table>
             </div>
           )}
-        </div>
         </div>
       </DialogContent>
     </Dialog>
