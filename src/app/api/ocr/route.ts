@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  console.log('API KEY:', process.env.GEMINI_API_KEY);
+  // console.log('API KEY:', process.env.GEMINI_API_KEY);
   try {
     const { base64, mediaType } = await request.json();
 
