@@ -16,35 +16,42 @@ function sanitizeContact(contact: any): string {
   return digits;
 }
 
-// ─── Course & Department ──────────────────────────────────
-async function getCourseAndDepartment(adName: string): Promise<{ course: string; department: string }> {
-  if (!adName) return { course: "General Course", department: "Digifootprints" };
+// ─── Course & Department Lookup ───────────────────────────
+async function getCourseAndDepartment(rawCourse: string): Promise<{ course: string; department: string }> {
+  if (!rawCourse) return { course: "General Course", department: "Digifootprints" };
 
-  const nameLower = String(adName).toLowerCase().trim();
+  const nameLower = String(rawCourse).toLowerCase().trim();
 
   try {
     const courseDoc = await Course.findOne({
       isActive: true,
       $or: [
         { name: { $regex: nameLower, $options: 'i' } },
-        { name: { $regex: adName,   $options: 'i' } }
+        { name: { $regex: rawCourse, $options: 'i' } }
       ]
     });
     if (courseDoc) {
-      return { course: courseDoc.name, department: courseDoc.department };
+      return { 
+        course: courseDoc.name, 
+        department: courseDoc.department || "Digifootprints" 
+      };
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error("Course lookup error:", e);
+  }
 
-  const cleaned = String(adName)
-    .replace(/ad|campaign|new|202[0-9]|feb|may|jun|jul|aug|sep|oct|nov|dec/gi, '')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
+  // Fallback
+  const cleaned = String(rawCourse)
+  
     .trim();
 
-  return { course: cleaned || "General Course", department: "Digifootprints" };
+  return { 
+    course: cleaned || "General Course", 
+    department: "Digifootprints" 
+  };
 }
 
-// ─── Sequential Enquiry ID (atomic) ──────────────────────
+// ─── Sequential Enquiry ID ────────────────────────────────
 async function generateEnquiryId(): Promise<string> {
   const counter = await Counter.findOneAndUpdate(
     { _id: 'enquiryId' },
@@ -54,13 +61,18 @@ async function generateEnquiryId(): Promise<string> {
   return `LD${String(counter.seq).padStart(3, '0')}`;
 }
 
-// ─── POST ─────────────────────────────────────────────────
+// ─── POST Handler ─────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
 
     const user = await getUserFromCookies();
-    if (!user || user.role !== 'marketing') {
+    if (!user) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    }
+
+    const userRole = (user.role || '').toLowerCase();
+    if (userRole !== 'marketing') {
       return NextResponse.json(
         { success: false, message: "Only Marketing can upload" },
         { status: 403 }
@@ -69,53 +81,52 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
+
     if (!file) {
-      return NextResponse.json(
-        { success: false, message: "No file uploaded" },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "No file uploaded" }, { status: 400 });
     }
 
-    const buffer   = await file.arrayBuffer();
+    const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: 'array' });
 
     let allLeads: any[] = [];
     let skipped = 0;
 
-    // ── Parse all sheets ──
     for (const sheetName of workbook.SheetNames) {
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData  = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
       for (const row of jsonData as any[]) {
-        const adName  = row['ad_name'] || row['Ad Name'] || row['campaign_name'] || row['adset_name'] || '';
-        const { course, department } = await getCourseAndDepartment(adName);
+        // Raw course from Excel
+        const rawCourse = row['course'] || row['Course'] || row['ad_name'] || row['Ad Name'] || '';
+
+        // Get clean course + department
+        const { course, department } = await getCourseAndDepartment(rawCourse);
 
         const rawEqId = String(row['id'] || row['lead_id'] || '').trim();
         const contact = sanitizeContact(row['phone_number'] || row['Phone Number'] || row['phone']);
-        const eqName  = String(row['full_name'] || row['Full Name'] || row['name'] || '').trim();
+        const eqName = String(row['full_name'] || row['Full Name'] || row['name'] || '').trim();
 
-        // Skip if no name or contact
         if (!eqName || !contact) {
           skipped++;
           continue;
         }
 
         allLeads.push({
-          eqId:       rawEqId || `LEAD-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          eqId: rawEqId || `LEAD-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           eqName,
           contact,
           course,
           department,
-          city:       row['city']   || row['City']   || '',
-          state:      row['state']  || row['State']  || '',
-          email:      row['email']  || row['Email']  || '',
-          source:     "marketing-upload",
+          city: row['city'] || row['City'] || '',
+          state: row['state'] || row['State'] || '',
+          email: row['email'] || row['Email'] || '',
+          source: "marketing-upload",
           uploadedBy: user.employeeId,
           uploadedAt: new Date(),
-          status:     "fresh",
-          remark:     row['Remark'] || row['remark'] || '',
-          priority:   'cold',
+          status: "fresh",
+          remark: row['Remark'] || row['remark'] || '',
+          priority: 'cold',
         });
       }
     }
@@ -127,38 +138,33 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ── Duplicate check by eqId ──
-    const incomingEqIds   = allLeads.map(l => l.eqId).filter(Boolean);
-    const existingInDB    = await Lead.find(
-      { eqId: { $in: incomingEqIds } },
-      { eqId: 1 }
-    ).lean();
-    const existingEqIdSet = new Set(existingInDB.map((l: any) => String(l.eqId)));
+    // Duplicate Check
+    const incomingEqIds = allLeads.map(l => l.eqId).filter(Boolean);
+    const existingInDB = await Lead.find({ eqId: { $in: incomingEqIds } }, { eqId: 1 }).lean();
+    const existingSet = new Set(existingInDB.map((l: any) => String(l.eqId)));
 
-    const newLeads      = allLeads.filter(l => !existingEqIdSet.has(String(l.eqId)));
+    const newLeads = allLeads.filter(l => !existingSet.has(String(l.eqId)));
     const duplicateCount = allLeads.length - newLeads.length;
 
-    // All duplicates — block
     if (newLeads.length === 0) {
       return NextResponse.json({
         success: false,
-        message: `All ${duplicateCount} leads already exist. No new leads uploaded.`,
+        message: `All ${duplicateCount} leads already exist.`,
         duplicates: duplicateCount,
       }, { status: 400 });
     }
 
-    // ── Assign sequential enquiryId only to new leads ──
+    // Generate Enquiry IDs
     for (const lead of newLeads) {
       lead.enquiryId = await generateEnquiryId();
     }
 
-    // ── Insert new leads ──
     const result = await Lead.insertMany(newLeads, { ordered: false });
 
     return NextResponse.json({
       success: true,
-      message: `${result.length} new leads uploaded${duplicateCount > 0 ? `, ${duplicateCount} duplicates skipped` : ''}.`,
-      inserted:   result.length,
+      message: `${result.length} new leads uploaded successfully!`,
+      inserted: result.length,
       duplicates: duplicateCount,
       skipped,
     });

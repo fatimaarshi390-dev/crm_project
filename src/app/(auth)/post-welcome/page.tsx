@@ -18,8 +18,8 @@ export default function PostLoginWelcome() {
 
     const timer = setTimeout(() => {
       if (user.role === 'admin') router.push('/dashboard/admin');
-      else if (user.role === 'sales') router.push('/dashboard/sales');
-      else if (user.role === 'marketing') {
+      else if (user.role === 'sales'|| user.role==='Sales') router.push('/dashboard/sales');
+      else if (user.role === 'marketing' || user.role === 'Marketing') {
         router.push('/dashboard/marketing');
       } else {
         router.push('/dashboard');

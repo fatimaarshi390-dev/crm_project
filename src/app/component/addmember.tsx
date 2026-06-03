@@ -40,6 +40,7 @@ interface Role {
 interface Division {
   _id: string;
   divisionName: string;
+  departmentName: string;
 }
 
 export default function AddMemberDialog() {
@@ -58,15 +59,18 @@ export default function AddMemberDialog() {
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
   const [departments, setDepartments] = useState<Department[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
+
+  const [filteredDivisions, setFilteredDivisions] = useState<Division[]>([]);
 
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
   const [addingRole, setAddingRole] = useState(false);
 
-  // Fetch all required data
+  // Fetch Data
   useEffect(() => {
     fetchDepartments();
     fetchRoles();
@@ -105,101 +109,83 @@ export default function AddMemberDialog() {
     }
   };
 
+  // Cascading: Department → Division
+  useEffect(() => {
+    if (formData.department) {
+      const matchedDivisions = divisions.filter(
+        (div) => div.departmentName === formData.department
+      );
+      setFilteredDivisions(matchedDivisions);
+
+      // Auto select first division if only one available
+      if (matchedDivisions.length === 1) {
+        setFormData((prev) => ({
+          ...prev,
+          division: matchedDivisions[0].divisionName,
+        }));
+      } else {
+        setFormData((prev) => ({ ...prev, division: "" }));
+      }
+    } else {
+      setFilteredDivisions([]);
+      setFormData((prev) => ({ ...prev, division: "" }));
+    }
+  }, [formData.department, divisions]);
+
   // Quick Add Role
-//  const addQuickRole = async () => {
-//   if (!newRoleName.trim()) {
-//     toast.error("Role name is required");
-//     return;
-//   }
-
-//   // Get first division if none selected
-//   const selectedDivision = formData.division || divisions[0]?._id;
-
-//   if (!selectedDivision) {
-//     toast.error("Please select a Division first or create one");
-//     return;
-//   }
-
-//   setAddingRole(true);
-//   try {
-//     const res = await fetch('/api/roles', {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify({
-//         roleName: newRoleName.trim(),
-//         division: selectedDivision,           // ← Fixed
-//         departmentName: "General",
-//         description: "Added via quick add",
-//       }),
-//     });
-
-//     const data = await res.json();
-//     if (data.success) {
-//       toast.success("New Role Added Successfully!");
-//       setNewRoleName("");
-//       setShowRoleModal(false);
-//       fetchRoles();           // Refresh dropdown
-//     } else {
-//       toast.error(data.message || "Failed to add role");
-//     }
-//   } catch (error) {
-//     toast.error("Something went wrong");
-//   } finally {
-//     setAddingRole(false);
-//   }
-// };
-// Quick Add Role (Division Check Removed)
-const addQuickRole = async () => {
-  if (!newRoleName.trim()) {
-    toast.error("Role name is required");
-    return;
-  }
-
-  setAddingRole(true);
-  try {
-    const res = await fetch('/api/roles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        roleName: newRoleName.trim(),
-        division: formData.division || null,        // Can be empty now
-        departmentName: "General",
-        description: "Added via quick add from member form",
-      }),
-    });
-
-    const data = await res.json();
-    if (data.success) {
-      toast.success("New Role Added Successfully!");
-      setNewRoleName("");
-      setShowRoleModal(false);
-      fetchRoles();        // Refresh roles list
-    } else {
-      toast.error(data.message || "Failed to add role");
+  const addQuickRole = async () => {
+    if (!newRoleName.trim()) {
+      toast.error("Role name is required");
+      return;
     }
-  } catch (error) {
-    toast.error("Something went wrong");
-  } finally {
-    setAddingRole(false);
-  }
-};
-const deleteRole = async (id: string, roleName: string) => {
-  if (!confirm(`Delete role "${roleName}"?`)) return;
 
-  try {
-    const res = await fetch(`/api/roles/${id}`, { method: 'DELETE' });
-    const data = await res.json();
+    setAddingRole(true);
+    try {
+      const res = await fetch('/api/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roleName: newRoleName.trim(),
+          division: formData.division || null,
+          departmentName: formData.department || "General",
+          description: "Added via quick add",
+        }),
+      });
 
-    if (data.success) {
-      toast.success(`Role "${roleName}" deleted`);
-      fetchRoles();        // Refresh list
-    } else {
-      toast.error(data.message || "Failed to delete role");
+      const data = await res.json();
+      if (data.success) {
+        toast.success("New Role Added Successfully!");
+        setNewRoleName("");
+        setShowRoleModal(false);
+        fetchRoles();
+      } else {
+        toast.error(data.message || "Failed to add role");
+      }
+    } catch (error) {
+      toast.error("Something went wrong");
+    } finally {
+      setAddingRole(false);
     }
-  } catch (error) {
-    toast.error("Something went wrong");
-  }
-};
+  };
+
+  const deleteRole = async (id: string, roleName: string) => {
+    if (!confirm(`Delete role "${roleName}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/roles/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(`Role "${roleName}" deleted`);
+        fetchRoles();
+      } else {
+        toast.error(data.message || "Failed to delete role");
+      }
+    } catch (error) {
+      toast.error("Something went wrong");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -215,7 +201,6 @@ const deleteRole = async (id: string, roleName: string) => {
 
       if (res.ok && data.success) {
         toast.success("Member added successfully!");
-        // Reset form
         setFormData({
           name: "", email: "", phone: "", employeeId: "", password: "",
           role: "", division: "", department: "", joiningDate: "", salary: ""
@@ -323,83 +308,42 @@ const deleteRole = async (id: string, roleName: string) => {
             </div>
 
             {/* Role with Quick Add */}
-          {/* Role Section with Delete Option */}
-<div className="col-span-2">
-  <Label>Role <span className="text-red-500">*</span></Label>
-  
-  <div className="flex gap-2 mb-3">
-    {/* Role Dropdown */}
-    <Select 
-      value={formData.role} 
-      onValueChange={(value) => setFormData({ ...formData, role: value })}
-      required
-    >
-      <SelectTrigger className="flex-1">
-        <SelectValue placeholder="Select Role" />
-      </SelectTrigger>
-      <SelectContent>
-        {roles.map((role) => (
-          <SelectItem key={role._id} value={role.roleName}>
-            {role.roleName}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+            <div className="col-span-2">
+              <Label>Role <span className="text-red-500">*</span></Label>
+              <div className="flex gap-2 mb-3">
+                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })} required>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role._id} value={role.roleName}>
+                        {role.roleName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-    {/* Quick Add Button */}
-    <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => setShowRoleModal(true)}
-    >
-      <Plus size={20} />
-    </Button>
-  </div>
+                <Button type="button" variant="outline" size="icon" onClick={() => setShowRoleModal(true)}>
+                  <Plus size={20} />
+                </Button>
+              </div>
 
-  {/* Roles List with Delete Button */}
-  <div className="flex flex-wrap gap-2">
-    {roles.map((role) => (
-      <div
-        key={role._id}
-        className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-sm px-3 py-1.5 rounded-full group"
-      >
-        <span>{role.roleName}</span>
-        <button
-          type="button"
-          onClick={() => deleteRole(role._id, role.roleName)}
-          className="text-red-500 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          ✕
-        </button>
-      </div>
-    ))}
-  </div>
-</div>
-            {/* Division */}
-            <div className="col-span-2 md:col-span-1">
-              <Label>Department <span className="text-red-500">*</span></Label>
-              <Select 
-                value={formData.division} 
-                onValueChange={(value) => setFormData({ ...formData, division: value })}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Division" />
-                </SelectTrigger>
-                <SelectContent>
-                  {divisions.map((div) => (
-                    <SelectItem key={div._id} value={div.divisionName}>
-                      {div.divisionName} ({div.departmentName})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap gap-2">
+                {roles.map((role) => (
+                  <div key={role._id} className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-sm px-3 py-1.5 rounded-full group">
+                    <span>{role.roleName}</span>
+                    <button type="button" onClick={() => deleteRole(role._id, role.roleName)} className="text-red-500 hover:text-red-600 opacity-0 group-hover:opacity-100">
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Department */}
-            <div className="col-span-2">
-              <Label>Division<span className="text-red-500">*</span></Label>
+            {/* Department Dropdown */}
+            <div>
+              <Label>Division <span className="text-red-500">*</span></Label>
               <Select 
                 value={formData.department} 
                 onValueChange={(value) => setFormData({ ...formData, department: value })}
@@ -414,6 +358,31 @@ const deleteRole = async (id: string, roleName: string) => {
                       {dept.name} ({dept.code})
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Division Dropdown (Cascading from Department) */}
+            <div>
+              <Label>Department<span className="text-red-500">*</span></Label>
+              <Select 
+                value={formData.division} 
+                onValueChange={(value) => setFormData({ ...formData, division: value })}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Division" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredDivisions.length > 0 ? (
+                    filteredDivisions.map((div) => (
+                      <SelectItem key={div._id} value={div.divisionName}>
+                        {div.divisionName}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>Select Department first</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
